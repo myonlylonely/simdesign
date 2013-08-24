@@ -359,7 +359,7 @@ type
   end;
 
   //  List of canvas layers
-  TpgLayerList = class(TLuidList)
+  TpgLayerList = class(TUniqueIDList)
   private
     function GetItems(Index: integer): TpgLayer;
   protected

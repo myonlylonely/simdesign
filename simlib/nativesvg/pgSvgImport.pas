@@ -23,7 +23,7 @@ uses
   Classes, SysUtils,
 
   // NativeXml component
-  NativeXml,
+  NativeXml, NativeXmlC14n,
 
   // Simdesign general units
   sdSortedLists, sdDebug,
@@ -472,11 +472,10 @@ begin
   Xml := TNativeXml.Create(Self);
   try
     // load from stream
-    DoDebugOut(Self, wsInfo, IntToStr(AStream.Position) + ' ' + IntToStr(AStream.Size));
     Xml.LoadFromStream(AStream);
 
     // class method: canonicalize
-    Xml.Canonicalize;
+    TNativeXmlC14n.Canonicalize(Xml);
 
     if not assigned(Xml.Root) or (Xml.Root.Name <> 'svg') then
     begin

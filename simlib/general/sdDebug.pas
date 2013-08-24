@@ -46,13 +46,9 @@ type
   PSingle = ^Single;
   PDouble = ^Double;
 
-  // TFormatSettings stub
-  TFormatSettings = record
-  end;
-
   PWord = ^Word;
 
-  function StrToFloatDef(S: AnsiString; Default: Double; AFormatSettings: TFormatSettings): Double;
+  function StrToFloatDef(S: AnsiString; Default: Double = 0): Double;
   function StrToBool(S: AnsiString): Boolean;
   function StrToBoolDef(S: AnsiString; Default: Boolean): Boolean;
 {$endif}
@@ -88,7 +84,6 @@ type
     FOnDebugOut: TsdDebugEvent;
   public
     procedure DoDebugOut(Sender: TObject; WarnStyle: TsdWarnStyle; const AMessage: Utf8String); virtual;
-    // Connect to OnDebugOut to get debug information in the client application
     property OnDebugOut: TsdDebugEvent read FOnDebugOut write FOnDebugOut;
   end;
 
@@ -105,14 +100,12 @@ type
     FOwner: TDebugComponent;
     procedure DoDebugOut(Sender: TObject; WarnStyle: TsdWarnStyle; const AMessage: Utf8String); virtual;
   public
-    constructor CreateDebug(AOwner: TDebugComponent); virtual;
+    constructor CreateDebug(AOwner: TDebugComponent);
   end;
 
 { Functions }
 
 function sdDebugMessageToString(Sender: TObject; WarnStyle: TsdWarnStyle; const AMessage: Utf8String): Utf8String;
-
-function sdClassName(AObject: TObject): Utf8String;
 
 implementation
 
@@ -121,7 +114,7 @@ implementation
 uses
   SysUtils;
 
-function StrToFloatDef(S: AnsiString; Default: Double; AFormatSettings: TFormatSettings): Double;
+function StrToFloatDef(S: AnsiString; Default: Double = 0): Double;
 begin
   try
     Result:= StrToFloat(S);
@@ -164,7 +157,7 @@ begin
   begin
     if assigned(TDebugComponent(AOwner).FOnDebugOut) then
     begin
-      TDebugComponent(AOwner).FOnDebugOut(Sender, WarnStyle, AMessage);
+      TDebugComponent(AOwner).OnDebugOut(Sender, WarnStyle, AMessage);
       exit;
     end;
     AOwner := AOwner.Owner;
@@ -183,7 +176,7 @@ end;
 
 constructor TDebugPersistent.CreateDebug(AOwner: TDebugComponent);
 begin
-  inherited Create;
+  inherited;
   FOwner := AOwner;
 end;
 
@@ -200,21 +193,12 @@ var
   SenderString: Utf8String;
 begin
   if assigned(Sender)  then
-    SenderString := Utf8String(Sender.ClassName)
+    SenderString := Sender.ClassName
   else
     SenderString := '';
   Result := '[' + cWarnStyleNames[WarnStyle] + '] ' + SenderString + ': ' + AMessage;
 end;
 
-function sdClassName(AObject: TObject): Utf8String;
-begin
-  Result := 'nil';
-  if assigned(AObject) then
-    Result := Utf8String(AObject.ClassName);
-end;
-
 end.
-
-
 
 

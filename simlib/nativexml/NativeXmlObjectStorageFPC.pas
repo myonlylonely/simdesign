@@ -1,4 +1,4 @@
-{ unit NativeXmlObjectStorage
+{ unit NativeXmlObjectStorageFPC
 
   This unit provides functionality to store any TObject descendant to an XML file
   or stream. Internally it makes full use of RTTI (RunTime Type Information) in
@@ -24,6 +24,8 @@
     Adam Siwon:
     - fixes for stored properties
     - TCollection items
+    Tim Sinaeve
+    - FPC version of RTTI
 
   It is NOT allowed under ANY circumstances to publish or copy this code
   without accepting the license conditions in accompanying LICENSE.txt
@@ -34,7 +36,7 @@
 
   Please visit http://www.simdesign.nl/xml.html for more information.
 }
-unit NativeXmlObjectStorage;
+unit NativeXmlObjectStorageFPC;
 
 {$i simdesign.inc}
 
@@ -648,25 +650,21 @@ var
   PropType: PTypeInfo;
   AChildNode: TXmlNode;
   ACollectionNode: TXmlNode;
-
   //local
   procedure WritePropName;
   begin
     AChildNode := ANode.NodeNew(PPropInfo(PropInfo)^.Name);
   end;
-
   //local
   procedure WriteInteger(Value: Int64);
   begin
     AChildNode.Value := UTF8String(IntToStr(Value));
   end;
-
   //local
   procedure WriteString(Value: string);
   begin
     AChildNode.ValueUnicode := Value;
   end;
-
   //local
   procedure WriteSet(Value: Longint);
   var
@@ -674,7 +672,8 @@ var
     BaseType: PTypeInfo;
     S, Enum: string;
   begin
-    BaseType := GetTypeData(PropType)^.CompType^;
+    S := '';
+    BaseType := GetTypeData(PropType)^.CompType;
     for i := 0 to SizeOf(TIntegerSet) * 8 - 1 do
     begin
       if i in TIntegerSet(Value) then
@@ -688,20 +687,19 @@ var
     end;
     AChildNode.Value := UTF8String(Format('[%s]', [S]));
   end;
-
   //local
   procedure WriteIntProp(IntType: PTypeInfo; Value: Longint);
   var
     Ident: string;
     IntToIdent: TIntToIdent;
   begin
+    Ident := '';
     IntToIdent := FindIntToIdent(IntType);
     if Assigned(IntToIdent) and IntToIdent(Value, Ident) then
       WriteString(Ident)
     else
       WriteInteger(Value);
   end;
-
   //local
   procedure WriteCollectionProp(Collection: TCollection);
   var
@@ -716,7 +714,6 @@ var
       end;
     end;
   end;
-
   //local
   procedure WriteOrdProp;
   var
@@ -727,14 +724,13 @@ var
     begin
       WritePropName;
       case PropType^.Kind of
-      tkInteger:     WriteIntProp(PPropInfo(PropInfo)^.PropType^, Value);
+      tkInteger:     WriteIntProp(PPropInfo(PropInfo)^.PropType, Value);
       tkChar:        WriteString(Chr(Value));
       tkSet:         WriteSet(Value);
       tkEnumeration: WriteString(GetEnumName(PropType, Value));
       end;
     end;
   end;
-
   //local
   procedure WriteFloatProp;
   var
@@ -744,7 +740,6 @@ var
     if not (Value = 0) then
       ANode.WriteFloat(PPropInfo(PropInfo)^.Name, Value);
   end;
-
   //local
   procedure WriteInt64Prop;
   var
@@ -754,7 +749,6 @@ var
     if not (Value = 0) then
       ANode.WriteInt64(PPropInfo(PropInfo)^.Name, Value);
   end;
-
   //local
   procedure WriteStrProp;
   var
@@ -764,7 +758,6 @@ var
     if not (length(Value) = 0) then
       ANode.WriteString(PPropInfo(PropInfo)^.Name, Value);
   end;
-
   //local
   procedure WriteWideStrProp;
   var
@@ -775,7 +768,6 @@ var
       ANode.WriteString(PPropInfo(PropInfo)^.Name, Value);
   end;
   {$ifdef D12UP}
-
   //local
   procedure WriteUnicodeStrProp;
   var
@@ -786,13 +778,11 @@ var
       ANode.WriteString(PPropInfo(PropInfo)^.Name, Value);
   end;
   {$endif}
-
   //local
   procedure WriteObjectProp;
   var
     Value: TObject;
     ComponentName: string;
-    //local-local
     function GetComponentName(Component: TComponent): string;
     begin
       if Component.Owner = AParent then
@@ -811,7 +801,7 @@ var
     if not assigned(Value) then
       exit;
     WritePropName;
-    if (Value is TComponent) and not (csSubComponent in TComponent(Value).ComponentStyle) then
+    if Value is TComponent then
     begin
       ComponentName := GetComponentName(TComponent(Value));
       if length(ComponentName) > 0 then
@@ -833,7 +823,6 @@ var
         ANode.NodeRemove(AChildNode);
     end;
   end;
-
   //local
   procedure WriteMethodProp;
   var
@@ -857,7 +846,6 @@ var
       end;
     end;
   end;
-
   //local
   function WriteVariantProp: boolean;
   var
@@ -906,17 +894,16 @@ var
       end;//case
     end;
   end;
-
 //main
 begin
   if (PPropInfo(PropInfo)^.SetProc <> nil) and
     (PPropInfo(PropInfo)^.GetProc <> nil) then
   begin
-    PropType := PPropInfo(PropInfo)^.PropType^;
+    PropType := PPropInfo(PropInfo)^.PropType;
     case PropType^.Kind of
     tkInteger, tkChar, tkEnumeration, tkSet: WriteOrdProp;
     tkFloat:                                 WriteFloatProp;
-    tkString, tkLString:                     WriteStrProp;
+    tkAString,tkString, tkLString:           WriteStrProp;
     {$ifdef D7UP}
     tkWString:                               WriteWideStrProp;
     {$endif}
@@ -1069,7 +1056,7 @@ begin
         try
           AReader := TReader.Create(S, 4096);
           try
-            while AReader.Position < S.Size do
+            while not AReader.EndOfList do
               TReaderAccess(AReader).ReadProperty(TPersistent(AObject));
           finally
             AReader.Free;
@@ -1126,7 +1113,7 @@ var
   begin
     Result := True;
     ASet := 0;
-    EnumType := GetTypeData(PropType)^.CompType^;
+    EnumType := GetTypeData(PropType)^.CompType;
     S := copy(AValue, 2, length(AValue) - 2);
     repeat
       P := Pos(',', S);
@@ -1305,7 +1292,7 @@ begin
   if (PPropInfo(PropInfo)^.SetProc <> nil) and
     (PPropInfo(PropInfo)^.GetProc <> nil) then
   begin
-    PropType := PPropInfo(PropInfo)^.PropType^;
+    PropType := PPropInfo(PropInfo)^.PropType;
     AChildNode := ANode.NodeByName(PPropInfo(PropInfo)^.Name);
     if assigned(AChildNode) then
     begin
@@ -1316,6 +1303,7 @@ begin
       tkSet:         SetSetProp(AChildNode.Value);
       tkEnumeration: SetEnumProp(AChildNode.Value);
       tkFloat:       SetFloatProp(AObject, PropInfo, AChildNode.GetValueAsFloat);
+      tkAString,
       tkString,
       tkLString:     SetStrProp(AObject, PropInfo, AChildNode.Value);
       {$ifndef D12up}
@@ -1342,6 +1330,7 @@ begin
         tkSet:         SetOrdProp(AObject, PropInfo, PPropInfo(PropInfo)^.Default);
         tkEnumeration: SetOrdProp(AObject, PropInfo, PPropInfo(PropInfo)^.Default);
         tkFloat:       SetFloatProp(AObject, PropInfo, 0);
+        tkAString,
         tkString,
         tkLString,
         tkWString:     SetStrProp(AObject, PropInfo, '');
